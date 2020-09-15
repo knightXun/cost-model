@@ -70,6 +70,7 @@ type Accesses struct {
 	GPUAllocationRecorder         *prometheus.GaugeVec
 	PVAllocationRecorder          *prometheus.GaugeVec
 	ClusterManagementCostRecorder *prometheus.GaugeVec
+	LBCostRecorder                *prometheus.GaugeVec
 	NetworkZoneEgressRecorder     prometheus.Gauge
 	NetworkRegionEgressRecorder   prometheus.Gauge
 	NetworkInternetEgressRecorder prometheus.Gauge
@@ -818,7 +819,7 @@ func Initialize(additionalConfigWatchers ...ConfigWatchers) {
 
 	// TODO: General Architecture Note: Several passes have been made to modularize a lot of
 	// TODO: our code, but the router still continues to be the obvious entry point for new \
-	// TODO: features. We should look to spliting out the actual "router" functionality and
+	// TODO: features. We should look to split out the actual "router" functionality and
 	// TODO: implement a builder -> controller for stitching new features and other dependencies.
 	clusterManager := newClusterManager()
 
@@ -887,6 +888,10 @@ func Initialize(additionalConfigWatchers ...ConfigWatchers) {
 		Name: "kubecost_cluster_management_cost",
 		Help: "kubecost_cluster_management_cost Hourly cost paid as a cluster management fee.",
 	}, []string{"provisioner_name"})
+	LBCostRecorder := prometheus.NewGaugeVec(prometheus.GaugeOpts{ // don't know if necessary to differentiate ELB vs. ALB cost
+		Name: "load_balancer_cost",
+		Help: "load_balancer_cost Hourly cost of load balancer",
+	}, []string{"ip_address", "namespace", "service_name"}) // will likely need some adjustments
 
 	prometheus.MustRegister(cpuGv)
 	prometheus.MustRegister(ramGv)
@@ -900,6 +905,7 @@ func Initialize(additionalConfigWatchers ...ConfigWatchers) {
 	prometheus.MustRegister(GPUAllocation)
 	prometheus.MustRegister(NetworkZoneEgressRecorder, NetworkRegionEgressRecorder, NetworkInternetEgressRecorder)
 	prometheus.MustRegister(ClusterManagementCostRecorder)
+	prometheus.MustRegister(LBCostRecorder)
 	prometheus.MustRegister(ServiceCollector{
 		KubeClientSet: kubeClientset,
 	})
@@ -936,6 +942,7 @@ func Initialize(additionalConfigWatchers ...ConfigWatchers) {
 		NetworkInternetEgressRecorder: NetworkInternetEgressRecorder,
 		PersistentVolumePriceRecorder: pvGv,
 		ClusterManagementCostRecorder: ClusterManagementCostRecorder,
+		LBCostRecorder:                LBCostRecorder,
 		Model:                         NewCostModel(k8sCache),
 		OutOfClusterCache:             outOfClusterCache,
 	}
